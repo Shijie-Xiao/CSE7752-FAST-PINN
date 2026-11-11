@@ -38,8 +38,9 @@ def setup_torch(threads=8):
     torch.set_default_dtype(torch.float64)
 
 
-def split(test=TEST_STORMS):
-    storms = load_storms()
+def split(test=TEST_STORMS, feature_set="climatology"):
+    """Train / hold-out storms and a feature scaler fitted on the training storms only."""
+    storms = load_storms(feature_set=feature_set)
     train = [s for s in storms if s.name not in test]
     test_ = [s for s in storms if s.name in test]
     return train, test_, FeatureScaler(train)

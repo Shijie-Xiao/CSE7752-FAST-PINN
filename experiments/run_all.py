@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run all experiments in order (~25 min on a laptop CPU).
+"""Run all experiments in order (~40 min on a laptop CPU).
 
     python experiments/run_all.py          # all
     python experiments/run_all.py 2 3      # selected
@@ -14,11 +14,13 @@ import warnings
 import exp1_pinn_solver
 import exp2_twin
 import exp3_real_storms
+import exp4_ocean_inputs
 
 STEPS = {
     "1": ("PINN as a FAST solver", exp1_pinn_solver.main),
     "2": ("twin experiments (recovery and compensation)", exp2_twin.main),
     "3": ("real storms: calibration and hold-out prediction", exp3_real_storms.main),
+    "4": ("ocean inputs of the alpha network: climatology vs ORAS5", exp4_ocean_inputs.main),
 }
 
 if __name__ == "__main__":

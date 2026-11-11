@@ -59,6 +59,18 @@ def test_obs_operator_matches_fast(batch):
         np.testing.assert_allclose(out[i, :s.T], ref, rtol=1e-12)
 
 
+@pytest.mark.parametrize("feature_set", ["climatology", "oras5", "both"])
+def test_feature_sets(feature_set):
+    from fastpinn.config import FEATURE_SETS
+    s = load_storms(["IRMA"], feature_set=feature_set)[0]
+    assert s.features.shape == (s.T, len(FEATURE_SETS[feature_set]))
+    assert np.all(np.isfinite(s.features))
+    if feature_set == "oras5":                     # physical ranges of the ORAS5 inputs
+        sst, t100, d26, tchp = s.features[:, 0], s.features[:, 2], s.features[:, 3], s.features[:, 4]
+        assert 15 < np.median(sst) < 33 and np.all(t100 <= sst + 0.5)
+        assert np.all(d26 >= 0) and np.all(tchp >= 0)
+
+
 def test_alpha_net_range():
     net = AlphaNet(6)
     a = net(torch.randn(100, 6) * 10)

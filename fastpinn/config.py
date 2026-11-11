@@ -33,10 +33,23 @@ T_STAR = 1.0 / (KAPPA * V_STAR)
 #: IBTrACS observation cadence (the hourly series is interpolated between).
 OBS_EVERY_H = 6
 
-#: Ocean / storm-motion inputs o(t) of the alpha network g_phi: the
-#: quantities FAST's alpha formula is built from (upper-ocean structure and
-#: storm motion; Reviewer 4), plus Vp and a shallow-water/land indicator.
-OCEAN_FEATURES = ("log_hm", "log_strat", "log_depth", "u_T", "vp_norm", "shallow")
+#: Inputs o(t) of the alpha network g_phi, by source.
+#: * climatology: the quantities FAST's own alpha formula is built from --
+#:   monthly-climatology mixed-layer depth and stratification (FHLO
+#:   precalc_data), water depth -- plus storm motion, Vp and a land flag.
+#: * oras5: the ORAS5 ocean reanalysis for the actual month (multi-level
+#:   temperature -> SST, mixed-layer depth, T100, D26, TCHP; see
+#:   scripts/add_oras5_inputs.py) plus the same storm-motion / Vp / land inputs.
+#: * both: union of the two.
+_MOTION = ("u_T", "vp_norm", "shallow")
+FEATURE_SETS = {
+    "climatology": ("log_hm", "log_strat", "log_depth") + _MOTION,
+    "oras5": ("o5_sst", "log_o5_mld", "o5_t100", "o5_d26", "o5_tchp") + _MOTION,
+    "both": ("log_hm", "log_strat", "log_depth", "o5_sst", "log_o5_mld", "o5_t100", "o5_d26",
+             "o5_tchp") + _MOTION,
+}
+DEFAULT_FEATURES = "climatology"
+OCEAN_FEATURES = FEATURE_SETS[DEFAULT_FEATURES]
 
 #: Hold-out storms (2017): intense, landfalling, fast-moving, high-latitude.
 TEST_STORMS = ("HARVEY", "IRMA", "MARIA", "NATE", "OPHELIA")

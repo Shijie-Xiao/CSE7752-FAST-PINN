@@ -24,7 +24,7 @@ import torch
 from fast.fast_equations import initial_moisture
 from fast.wind_conversion import invert_vmax_to_axisym, translation_velocity
 
-from .config import DATA_DIR, KAPPA, OBS_EVERY_H, OCEAN_FEATURES, V_STAR
+from .config import DATA_DIR, DEFAULT_FEATURES, FEATURE_SETS, KAPPA, OBS_EVERY_H, V_STAR
 
 
 @dataclass
@@ -73,18 +73,32 @@ def thermo_split(alpha, beta, gamma):
     return eps, k
 
 
-def _features(df):
+def _features(df, feature_set=DEFAULT_FEATURES):
+    """Ocean / storm-motion inputs o(t) for the chosen feature set (see config.FEATURE_SETS)."""
     hm = np.nan_to_num(df["hm"].to_numpy(float), nan=30.0)
     st = np.nan_to_num(df["strat"].to_numpy(float), nan=0.1)
     depth = -np.nan_to_num(df["bathy"].to_numpy(float), nan=-100.0)
     shallow = ((depth <= hm) | (depth <= 0)).astype(float)
-    cols = {"log_hm": np.log(np.clip(hm, 1.0, None)), "log_strat": np.log(np.clip(st, 1e-2, None)),
-            "log_depth": np.log1p(np.clip(depth, 0.0, None)), "u_T": df["u_T"].to_numpy(float),
-            "vp_norm": df["vp"].to_numpy(float) / V_STAR, "shallow": shallow}
-    return np.column_stack([cols[c] for c in OCEAN_FEATURES])
+    cols = {"log_hm": lambda: np.log(np.clip(hm, 1.0, None)),
+            "log_strat": lambda: np.log(np.clip(st, 1e-2, None)),
+            "log_depth": lambda: np.log1p(np.clip(depth, 0.0, None)),
+            "u_T": lambda: df["u_T"].to_numpy(float),
+            "vp_norm": lambda: df["vp"].to_numpy(float) / V_STAR,
+            "shallow": lambda: shallow,
+            "o5_sst": lambda: df["o5_sst"].to_numpy(float),
+            "log_o5_mld": lambda: np.log(np.clip(df["o5_mld"].to_numpy(float), 1.0, None)),
+            "o5_t100": lambda: df["o5_t100"].to_numpy(float),
+            "o5_d26": lambda: df["o5_d26"].to_numpy(float),
+            "o5_tchp": lambda: df["o5_tchp"].to_numpy(float)}
+    names = FEATURE_SETS[feature_set]
+    need = {c.replace("log_", "") for c in names if "o5_" in c}
+    missing = sorted(need - set(df.columns))
+    if missing:
+        raise KeyError(f"{missing} not in the storm file: run scripts/add_oras5_inputs.py first")
+    return np.column_stack([cols[c]() for c in names])
 
 
-def load_storm(path) -> Storm:
+def load_storm(path, feature_set=DEFAULT_FEATURES) -> Storm:
     df = pd.read_csv(path)
     col = lambda c: df[c].to_numpy(float)  # noqa: E731
     alpha, beta, gamma, vp = col("alpha"), col("beta"), col("gamma"), col("vp")
@@ -97,7 +111,7 @@ def load_storm(path) -> Storm:
     V1 = invert_vmax_to_axisym(v_obs[1], lat[1], ut[1], vt[1])
     F0 = (KAPPA, alpha[0], beta[0], gamma[0], vp[0], xs[0])
     return Storm(name=path.stem.split("_")[-1], T=len(df), vp=vp, beta=beta, xs=xs, eps=eps, k=k,
-                 alpha_prior=alpha, features=_features(df), lat=lat, lon=lon, u_tran=ut, v_tran=vt,
+                 alpha_prior=alpha, features=_features(df, feature_set), lat=lat, lon=lon, u_tran=ut, v_tran=vt,
                  v_obs=v_obs, V0=float(V0), m0_prior=initial_moisture(V0, V1 - V0, F0),
                  meta={"storm_id": path.stem, "start": str(df["time"].iloc[0])})
 
@@ -106,11 +120,11 @@ def available_storms(data_dir=DATA_DIR):
     return sorted(p.stem.split("_")[-1] for p in data_dir.glob("*.csv"))
 
 
-def load_storms(names=None, data_dir=DATA_DIR):
+def load_storms(names=None, data_dir=DATA_DIR, feature_set=DEFAULT_FEATURES):
     paths = sorted(data_dir.glob("*.csv"))
     if names is not None:
         paths = [p for p in paths if p.stem.split("_")[-1] in set(names)]
-    return [load_storm(p) for p in paths]
+    return [load_storm(p, feature_set) for p in paths]
 
 
 class FeatureScaler:

@@ -22,6 +22,7 @@ companion EAS 6130 repository); only m0 and α are learned.
 | FAST ODEs as the physical backbone | `fast/fast_equations.py` (NumPy), `fastpinn/physics.py` (PyTorch, same equations) |
 | PINN with hard initial conditions V̂(0) = V0 (fixed) and m̂(0) = m0 (trainable, in (0, 1)) | `fastpinn/networks.py: TrajectoryNet`, `fastpinn/calibrate.py: PINNCalibrator` |
 | α(t) = g_φ(o(t)) from ocean inputs, shared across storms, physical range [0.13, 1] | `fastpinn/networks.py: AlphaNet` |
+| ORAS5 multi-level ocean information for learning α(t) | `scripts/add_oras5_inputs.py`, `experiments/exp4_ocean_inputs.py` |
 | L = w_obs L_obs + w_phys L_phys (+ prior near FAST defaults, + bound penalty) | `fastpinn/calibrate.py` |
 | Observation operator: modelled azimuthal-mean wind → IBTrACS maximum wind | `fastpinn/physics.py: obs_operator` (FAST's `axi_to_max_wind`) |
 | V* normalisation | `fastpinn/config.py: V_STAR` |
@@ -51,10 +52,21 @@ $$
 - **Initial wind.** V0 is the first IBTrACS wind inverted to the azimuthal
   mean with FAST's conversion, and held fixed. FAST's prior m0 is its usual
   inversion of Eq. (1).
-- **Ocean inputs o(t).** These are the quantities FAST's α formula is built
-  from: log mixed-layer depth, log stratification, log water depth,
-  translation speed, Vp, and a shallow-water/land flag. They come from FHLO's
-  monthly ocean climatology (`scripts/add_ocean_inputs.py`).
+- **Ocean inputs o(t).** Two sources can be selected
+  (`fastpinn/config.py: FEATURE_SETS`). Both also include translation speed,
+  Vp and a shallow-water/land flag.
+  - **Climatology** (`climatology`, the default in Experiments 2–3): the
+    quantities FAST's own α formula is built from, namely log mixed-layer
+    depth, log stratification and log water depth, from FHLO's monthly ocean
+    climatology (`scripts/add_ocean_inputs.py`).
+  - **ORAS5** (`oras5`): the ECMWF ORAS5 ocean reanalysis for the actual month
+    (`scripts/add_oras5_inputs.py`), as proposed. From the 75-level
+    temperature profiles it derives SST, the mixed-layer depth (ΔT = 0.5 °C),
+    **T100** (mean temperature of the top 100 m, the SST a storm can mix down
+    to), the 26 °C isotherm depth **D26**, and the tropical-cyclone heat
+    potential **TCHP**. These are interpolated in time between monthly means
+    and sampled along the track.
+  - **Both** (`both`): the union of the two.
 
 ## Data
 
@@ -86,7 +98,7 @@ The loss terms are defined as follows (t in hours):
 
 ## Results
 
-`python experiments/run_all.py` runs everything in about 25 min on a laptop
+`python experiments/run_all.py` runs everything in about 40 min on a laptop
 CPU. Results are written to `results/` and figures to `figures/`.
 
 ### 1. The PINN as a FAST solver — `exp1_pinn_solver.py`
@@ -204,13 +216,49 @@ Per storm (RMSE, FAST prior → PINN α-net + m0 from 24 h):
 
 ![fig3](figures/fig3_real_storms.png)
 
+### 4. Which ocean information should drive α? — `exp4_ocean_inputs.py`
+
+This uses the same protocol as Experiment 3 (joint calibration, 13 training
+and 5 hold-out storms). The inputs of g_φ are either FAST's climatology,
+ORAS5 for the actual month, or both.
+
+| inputs of g_φ | PINN train RMSE | PINN hold-out RMSE | shooting train RMSE | shooting hold-out RMSE |
+|---|---:|---:|---:|---:|
+| climatology (FAST's α inputs) | 9.4 | 22.9 | 8.2 | 27.4 |
+| **ORAS5** (SST, MLD, T100, D26, TCHP) | 6.3 | 21.8 | 8.6 | 34.7 |
+| both | **5.4** | **21.8** | 6.7 | 29.0 |
+
+All values are RMSE against IBTrACS in kt.
+
+- **ORAS5 improves the PINN calibration.** The in-sample error falls by 33 %
+  with ORAS5 alone and by 43 % with both input sets. The hold-out error
+  improves slightly, from 22.9 to 21.8 kt.
+  - Per storm, Harvey goes from 36.5 to 27.9 kt and Nate from 30.6 to 21.5 kt.
+  - Ophelia goes the other way, from 11.4 to 21.1 kt.
+- **Shooting overfits the richer inputs.** Its hold-out error rises from 27.4
+  to 34.7 kt with ORAS5 alone. With 13 training storms, the physics residual
+  of the PINN acts as a useful regulariser on g_φ; shooting has none.
+- **The learned α is physically consistent with ORAS5** (panel c). It is
+  smaller, i.e. the cold-wake feedback is stronger, where SST − T100 is larger,
+  i.e. where mixing reaches colder water (r = −0.36). FAST's prior α barely
+  follows this (r = −0.09).
+- **Recommendation.** Use ORAS5 (or both input sets) with the PINN
+  estimator. Out-of-sample gains need more training storms to be confirmed.
+
+![fig4](figures/fig4_ocean_inputs.png)
+
 ## Limitations
 
 - **Small sample.** There are 18 storms from a single season (2017). Only
   2017 has complete FAST inputs locally; more seasons (2003–2023 as proposed)
   plug in through `scripts/extract_fast_inputs.py`.
-- **Ocean inputs are climatological.** o(t) uses monthly climatology (FAST's
-  own α inputs), not ORAS5 multi-level fields.
+- **ORAS5 is monthly and coarse.** The freely available ORAS5 (ICDC
+  Hamburg, 1979–2018, no account) is monthly-mean only. It captures the
+  ocean state of that season and year, but not the storm's own cold wake or
+  pre-existing eddies on day scales. The 1° regridded product used here also
+  has a coarse land mask; coastal cells are filled from the nearest ocean
+  cell. ORAS5 after 2018 (e.g. for the 2024 FAST-ML storms) requires the
+  Copernicus CDS with a free account.
 - **The shear asymmetry is zero.** The data have no environmental wind
   vectors, so the observation operator includes the translation asymmetry
   only, exactly as FAST does in that case.
@@ -224,14 +272,15 @@ Per storm (RMSE, FAST prior → PINN α-net + m0 from 24 h):
 
 ```bash
 pip install -r requirements.txt
-python experiments/run_all.py                       # all experiments, ~25 min on CPU
+python experiments/run_all.py                       # all experiments, ~40 min on CPU
 python experiments/exp3_real_storms.py --figure     # redraw a figure from saved results
-python -m pytest -q tests                           # 6 tests
+python -m pytest -q tests                           # 9 tests
 ```
 
 To rebuild the inputs:
 
 ```bash
 python scripts/extract_fast_inputs.py --src "<path>/Project/FAST/training_data"
-python scripts/add_ocean_inputs.py --fhlo <path to an FHLO clone>
+python scripts/add_ocean_inputs.py --fhlo <path to an FHLO clone>   # climatology inputs
+python scripts/add_oras5_inputs.py      # downloads ORAS5 Mar-Dec 2017 (10 x 19 MB) into data/oras5/
 ```

@@ -19,7 +19,8 @@ V and Vp in m/s:
 * alpha, beta, gamma, Vp are the hourly ``scalars`` of the dataset;
   beta = 1 - eps - k, gamma = eps + alpha k (thermodynamic), alpha = ocean
   cold-wake factor 1 - 0.87 exp(-z) (see "ODEFAST Parameter Calculation").
-* chi*S = chi_ref * s_ref, NaN -> 1e-5 and floored at 1e-5 (FAST's
+* chi*S = chi_eff * s_ref, with chi_eff FAST's calibration of chi_ref
+  (``calibrate_chi``), NaN -> 1e-5 and floored at 1e-5 (FAST's
   ``XS_NAN_FALLBACK``, so m can still decay over land where Vp = 0).
 * Hour k's forcing is held constant on [k, k+1): FAST takes 4 sub-steps per
   hour, all with ``scalars[k]`` and ``xs[k]``.
@@ -50,9 +51,32 @@ def coeff_from_cd(cd=CD, h_bl=H_BL):
     return 0.5 * float(cd) / float(h_bl) * 3600.0
 
 
-def ventilation(chi, s):
-    """chi*S with FAST's NaN handling and floor (``process_one_pkl``)."""
-    xs = np.nan_to_num(np.asarray(chi, float) * np.asarray(s, float), nan=XS_FLOOR)
+#: FAST's (tropical_cyclone_risk / FHLO) calibration of the entropy deficit chi
+LOG_CHI_FAC, CHI_FAC, CHI_MAX = 0.5, 1.3, 5.0
+
+
+def calibrate_chi(chi, method="tc_risk"):
+    """Entropy deficit used in the ventilation term.
+
+    ``tc_risk`` (default; FAST as run in FHLO / tropical_cyclone_risk):
+    chi_eff = clip(exp(log(chi + 1e-3) + 0.5) + 1.3, 1e-5, 5).
+    ``raw``: chi unchanged. The stored 2017 ``fast_reference.csv`` was made with
+    raw chi; it makes the ventilation several times too weak and FAST
+    over-intensifies (bias +23 kt on the 2017 storms, against -0.4 kt with
+    the calibration).
+    """
+    chi = np.asarray(chi, float)
+    if method == "raw":
+        return chi
+    if method == "tc_risk":
+        c = np.maximum(np.nan_to_num(chi, nan=1e-10), 1e-10)
+        return np.clip(np.exp(np.log(c + 1e-3) + LOG_CHI_FAC) + CHI_FAC, 1e-5, CHI_MAX)
+    raise ValueError(method)
+
+
+def ventilation(chi, s, calibration="tc_risk"):
+    """chi*S with FAST's chi calibration, NaN handling and floor (``process_one_pkl``)."""
+    xs = np.nan_to_num(calibrate_chi(chi, calibration) * np.asarray(s, float), nan=XS_FLOOR)
     return np.maximum(xs, XS_FLOOR)
 
 

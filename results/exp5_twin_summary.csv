@@ -1,0 +1,8 @@
+method,mode,m0_mae,alpha_rmse_ocean,v_rmse_vs_truth_kt,wall_s
+FAST,none,0.1493,0.2117,10.8411,0.0000
+pinn,m0,0.0995,0.2117,6.7238,1805.5717
+pinn,alpha,0.1493,0.1952,6.0839,1926.6064
+pinn,joint,0.0979,0.1689,3.6996,2107.7834
+shooting,m0,0.1037,0.2117,4.3065,237.5138
+shooting,alpha,0.1493,0.2255,6.3875,305.3388
+shooting,joint,0.0355,0.1503,1.5260,300.5062

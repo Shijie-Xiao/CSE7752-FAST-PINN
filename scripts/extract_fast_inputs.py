@@ -64,7 +64,7 @@ def extract(storm_dir: Path, out_dir: Path):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--src", type=Path, required=True, help="training_data directory with <STORM>/ folders")
-    ap.add_argument("--out", type=Path, default=REPO / "data" / "storms")
+    ap.add_argument("--out", type=Path, default=REPO / "data" / "storms" / "2017")
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     dirs = sorted(p for p in args.src.iterdir() if p.is_dir() and any(p.glob("*_dataset.pkl")))

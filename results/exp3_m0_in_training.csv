@@ -1,0 +1,5 @@
+evaluation,season,variant,label,rmse_kt_mean,bias_kt,storms_better_than_fast,rmse_change_vs_fast_kt,ci95_low_kt,ci95_high_kt
+2017to2024,2024,pinn_alpha_only,"PINN: α-net, m0 fixed at FAST's",21.38,-4.61,7,-0.27,-3.47,3.62
+2017to2024,2024,pinn_joint,PINN: m0 + α-net,21.20,-5.63,6,-0.45,-3.54,2.95
+cv2017,2017,pinn_alpha_only,"PINN: α-net, m0 fixed at FAST's",16.24,-1.99,16,-6.54,-10.34,-2.96
+cv2017,2017,pinn_joint,PINN: m0 + α-net,15.25,0.58,18,-7.53,-10.81,-4.59

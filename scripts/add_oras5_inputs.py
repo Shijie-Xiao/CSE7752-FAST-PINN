@@ -21,7 +21,7 @@ with the nearest ocean value; the storm's land/shallow-water flag is a
 separate input. Monthly fields are placed at mid-month and interpolated
 linearly in time to each storm hour; space is nearest-neighbour.
 
-Writes columns o5_sst, o5_mld, o5_t100, o5_d26, o5_tchp into data/storms/*.csv.
+Writes columns o5_sst, o5_mld, o5_t100, o5_d26, o5_tchp into data/storms/2017/*.csv.
 
 Usage::
 
@@ -115,7 +115,7 @@ def derive(f: Path):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--oras5", type=Path, default=REPO / "data" / "oras5")
-    ap.add_argument("--data", type=Path, default=REPO / "data" / "storms")
+    ap.add_argument("--data", type=Path, default=REPO / "data" / "storms" / "2017")
     ap.add_argument("--no-download", action="store_true")
     args = ap.parse_args()
     args.oras5.mkdir(parents=True, exist_ok=True)

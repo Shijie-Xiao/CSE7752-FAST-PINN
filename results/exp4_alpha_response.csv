@@ -1,0 +1,13 @@
+net,input,name,low,high,alpha_low,alpha_high,d_alpha,fast_sign,agrees_with_fast
+trained on 2017,log_hm,mixed-layer depth,3.0886,4.1386,0.9940,1.0000,0.0060,1,True
+trained on 2017,log_strat,stratification below it,1.2222,2.7603,0.9989,0.9947,-0.0043,-1,True
+trained on 2017,log_depth,water depth,5.0556,8.6334,0.8955,0.9872,0.0918,-1,False
+trained on 2017,u_T,translation speed,1.4877,12.3892,0.9999,0.9629,-0.0370,1,False
+trained on 2017,vp_norm,Vp,0.3946,1.7793,0.9908,0.9993,0.0085,1,True
+trained on 2017,shallow,shallow-water / land flag,0.0000,1.0000,0.9869,1.0000,0.0131,1,True
+trained on 2024,log_hm,mixed-layer depth,3.0886,4.1386,0.7514,1.0000,0.2486,1,True
+trained on 2024,log_strat,stratification below it,1.2222,2.7603,1.0000,0.9896,-0.0104,-1,True
+trained on 2024,log_depth,water depth,5.0556,8.6334,1.0000,0.9993,-0.0007,-1,True
+trained on 2024,u_T,translation speed,1.4877,12.3892,0.9811,1.0000,0.0189,1,True
+trained on 2024,vp_norm,Vp,0.3946,1.7793,1.0000,0.9949,-0.0051,1,False
+trained on 2024,shallow,shallow-water / land flag,0.0000,1.0000,0.9996,0.3594,-0.6402,1,False

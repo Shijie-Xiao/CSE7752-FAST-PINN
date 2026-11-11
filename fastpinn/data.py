@@ -1,8 +1,9 @@
 """Storm data: FAST forcing, ocean inputs o(t) and IBTrACS observations.
 
-``data/storms/<STORM>.csv`` holds the hourly FAST inputs (alpha, beta,
-gamma, Vp, chi, S, track, IBTrACS wind; see the EAS 6130 repository) plus
-the ocean inputs added by ``scripts/add_ocean_inputs.py``.
+``data/storms/<season>/<storm id>.csv`` holds the hourly FAST inputs (alpha,
+beta, gamma, Vp, chi, S, track, IBTrACS wind; see the EAS 6130 repository)
+plus the ocean inputs added by ``scripts/add_ocean_inputs.py`` (and, for
+2017, ``scripts/add_oras5_inputs.py``).
 
 Re-parameterising alpha. FAST's data give beta = 1 - eps - k and
 gamma = eps + alpha k, so beta + gamma = 1 - k (1 - alpha) and
@@ -21,10 +22,11 @@ import numpy as np
 import pandas as pd
 import torch
 
-from fast.fast_equations import initial_moisture
+from fast.fast_equations import initial_moisture, ventilation
 from fast.wind_conversion import invert_vmax_to_axisym, translation_velocity
 
-from .config import DATA_DIR, DEFAULT_FEATURES, FEATURE_SETS, KAPPA, OBS_EVERY_H, V_STAR
+from .config import (CHI_CALIBRATION, DATA_DIR, DEFAULT_FEATURES, FEATURE_SETS, KAPPA, OBS_EVERY_H,
+                     TRAIN_SEASON, V_STAR)
 
 
 @dataclass
@@ -89,7 +91,8 @@ def _features(df, feature_set=DEFAULT_FEATURES):
             "log_o5_mld": lambda: np.log(np.clip(df["o5_mld"].to_numpy(float), 1.0, None)),
             "o5_t100": lambda: df["o5_t100"].to_numpy(float),
             "o5_d26": lambda: df["o5_d26"].to_numpy(float),
-            "o5_tchp": lambda: df["o5_tchp"].to_numpy(float)}
+            "o5_tchp": lambda: df["o5_tchp"].to_numpy(float),
+            "zero": lambda: np.zeros(len(df))}
     names = FEATURE_SETS[feature_set]
     need = {c.replace("log_", "") for c in names if "o5_" in c}
     missing = sorted(need - set(df.columns))
@@ -98,11 +101,11 @@ def _features(df, feature_set=DEFAULT_FEATURES):
     return np.column_stack([cols[c]() for c in names])
 
 
-def load_storm(path, feature_set=DEFAULT_FEATURES) -> Storm:
+def load_storm(path, feature_set=DEFAULT_FEATURES, chi_calibration=CHI_CALIBRATION) -> Storm:
     df = pd.read_csv(path)
     col = lambda c: df[c].to_numpy(float)  # noqa: E731
     alpha, beta, gamma, vp = col("alpha"), col("beta"), col("gamma"), col("vp")
-    xs = np.maximum(np.nan_to_num(col("chi") * col("S"), nan=1e-5), 1e-5)
+    xs = ventilation(col("chi"), col("S"), chi_calibration)
     eps, k = thermo_split(alpha, beta, gamma)
     lat, lon = col("lat"), col("lon")
     ut, vt = translation_velocity(lat, lon)
@@ -113,18 +116,23 @@ def load_storm(path, feature_set=DEFAULT_FEATURES) -> Storm:
     return Storm(name=path.stem.split("_")[-1], T=len(df), vp=vp, beta=beta, xs=xs, eps=eps, k=k,
                  alpha_prior=alpha, features=_features(df, feature_set), lat=lat, lon=lon, u_tran=ut, v_tran=vt,
                  v_obs=v_obs, V0=float(V0), m0_prior=initial_moisture(V0, V1 - V0, F0),
-                 meta={"storm_id": path.stem, "start": str(df["time"].iloc[0])})
+                 meta={"storm_id": path.stem, "season": int(path.parent.name), "path": str(path),
+                       "start": str(df["time"].iloc[0])})
 
 
-def available_storms(data_dir=DATA_DIR):
-    return sorted(p.stem.split("_")[-1] for p in data_dir.glob("*.csv"))
+def season_dir(season=TRAIN_SEASON):
+    return DATA_DIR / str(season)
 
 
-def load_storms(names=None, data_dir=DATA_DIR, feature_set=DEFAULT_FEATURES):
-    paths = sorted(data_dir.glob("*.csv"))
+def available_storms(season=TRAIN_SEASON):
+    return sorted(p.stem.split("_")[-1] for p in season_dir(season).glob("*.csv"))
+
+
+def load_storms(season=TRAIN_SEASON, names=None, feature_set=DEFAULT_FEATURES, chi_calibration=CHI_CALIBRATION):
+    paths = sorted(season_dir(season).glob("*.csv"))
     if names is not None:
         paths = [p for p in paths if p.stem.split("_")[-1] in set(names)]
-    return [load_storm(p, feature_set) for p in paths]
+    return [load_storm(p, feature_set, chi_calibration) for p in paths]
 
 
 class FeatureScaler:

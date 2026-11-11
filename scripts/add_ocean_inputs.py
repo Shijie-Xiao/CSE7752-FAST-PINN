@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Add the along-track ocean inputs o(t) used by the alpha network.
 
-The hourly FAST inputs in ``data/storms/*.csv`` (extracted from the FAST
+The hourly FAST inputs in ``data/storms/<season>/*.csv`` (extracted from the FAST
 training data, identical to the EAS 6130 repository) already contain FAST's
 physics-prior alpha. That alpha follows the FAST ocean-coupling formula
 
@@ -19,7 +19,7 @@ climatologies FAST uses (FHLO ``precalc_data``):
 
 Usage::
 
-    python scripts/add_ocean_inputs.py --fhlo <path to an FHLO clone>
+    python scripts/add_ocean_inputs.py --fhlo <path to an FHLO clone> --data data/storms/2024
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ def translation_speed(lat, lon):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--fhlo", type=Path, required=True)
-    ap.add_argument("--data", type=Path, default=REPO / "data" / "storms")
+    ap.add_argument("--data", type=Path, default=REPO / "data" / "storms" / "2017")
     args = ap.parse_args()
     pre = args.fhlo / "precalc_data"
     mld = xr.open_dataset(pre / "mld_climatology.nc")["mixed_layer"]
